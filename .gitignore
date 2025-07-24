@@ -1,0 +1,22 @@
+# Go
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Binaries for programs and plugins
+main
+tmp/
+*.test
+
+# Environment variables
+.env
+
+# Logs
+*.log
+air-errors.log
+
+# IDE settings
+.idea/
+.vscode/

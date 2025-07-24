@@ -1,0 +1,48 @@
+-- Create users table
+
+CREATE TABLE users (
+
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+
+    clerk_user_id VARCHAR(255) NOT NULL,
+
+    email VARCHAR(255) NOT NULL,
+
+    full_name VARCHAR(255),
+
+    username VARCHAR(50),
+
+    image_url VARCHAR(500),
+
+    active BOOLEAN DEFAULT true,
+
+    last_sign_in TIMESTAMP,
+
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+
+    deleted_at TIMESTAMP
+
+);
+
+-- Create indexes
+
+CREATE UNIQUE INDEX idx_clerk_user ON users(clerk_user_id);
+
+CREATE UNIQUE INDEX idx_user_email ON users(email);
+
+CREATE UNIQUE INDEX idx_username ON users(username) WHERE username IS NOT NULL;
+
+CREATE INDEX idx_users_deleted_at ON users(deleted_at);
+
+-- Add comments for documentation
+
+COMMENT ON TABLE users IS 'User accounts integrated with Clerk authentication';
+
+COMMENT ON COLUMN users.clerk_user_id IS 'Unique identifier from Clerk auth provider';
+
+COMMENT ON COLUMN users.email IS 'User email address, must be unique';
+
+COMMENT ON COLUMN users.username IS 'Optional unique username';
+

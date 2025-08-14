@@ -10,6 +10,8 @@ require (
 	gorm.io/gorm v1.30.0
 )
 
+require github.com/svix/svix-webhooks v1.71.0 // indirect
+
 require (
 	github.com/golang-migrate/migrate/v4 v4.18.3
 	github.com/hashicorp/errwrap v1.1.0 // indirect

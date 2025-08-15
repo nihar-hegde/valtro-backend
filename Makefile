@@ -12,7 +12,7 @@ all: build
 # Build the application binary
 build:
 	@echo "Building..."
-	@go build -o main cmd/api/main.go
+	go build -o main cmd/api/main.go
 
 # Run the application
 run:

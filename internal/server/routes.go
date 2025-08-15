@@ -26,6 +26,11 @@ func (s *Server) RegisterRoutes() {
 		// User routes
 		routes.RegisterUserRoutes(r, s.userHandler)
 	})
+
+	// Webhook routes (outside of API versioning as they're called by external services)
+	s.router.Route("/api", func(r chi.Router) {
+		routes.RegisterWebhookRoutes(r, s.webhookHandler)
+	})
 }
 
 // welcomeHandler handles the root route.

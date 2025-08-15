@@ -8,6 +8,7 @@ import (
 	"github.com/nihar-hegde/valtro-backend/internal/handlers/health"
 	"github.com/nihar-hegde/valtro-backend/internal/handlers/organization"
 	"github.com/nihar-hegde/valtro-backend/internal/handlers/user"
+	"github.com/nihar-hegde/valtro-backend/internal/handlers/webhook"
 
 	"github.com/go-chi/chi/v5"
 	"gorm.io/gorm"
@@ -20,6 +21,7 @@ type Server struct {
 	healthHandler   *health.Handler
 	userHandler     *user.Handler
 	orgHandler      *organization.Handler
+	webhookHandler  *webhook.Handler
 }
 
 // NewServer creates a new Server instance.
@@ -30,6 +32,7 @@ func NewServer(db *gorm.DB) *Server {
 		healthHandler:  health.NewHandler(db),
 		userHandler:    user.NewHandler(db),
 		orgHandler:     organization.NewHandler(db),
+		webhookHandler: webhook.NewHandler(db),
 	}
 
 	// Register all the application routes.

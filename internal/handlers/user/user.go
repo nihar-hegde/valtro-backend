@@ -112,11 +112,30 @@ func (h *Handler) GetByID(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
-	// Parse ID from URL
-	idStr := chi.URLParam(r, "id")
-	id, err := uuid.Parse(idStr)
+	// Get current user ID from JWT middleware (set by ClerkJWTMiddleware)
+	currentUserIDStr := r.Header.Get("X-User-ID")
+	if currentUserIDStr == "" {
+		response.SendUnauthorized(w, "User ID required")
+		return
+	}
+
+	currentUserID, err := uuid.Parse(currentUserIDStr)
+	if err != nil {
+		response.SendValidationError(w, "Invalid current user ID: "+err.Error())
+		return
+	}
+
+	// Parse target user ID from URL
+	targetUserIDStr := chi.URLParam(r, "id")
+	targetUserID, err := uuid.Parse(targetUserIDStr)
 	if err != nil {
 		response.SendValidationError(w, "Invalid user ID: ID must be a valid UUID")
+		return
+	}
+
+	// Authorization: Users can only update their own profile
+	if currentUserID != targetUserID {
+		response.SendForbidden(w, "You can only update your own profile")
 		return
 	}
 
@@ -128,7 +147,7 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Update user through service
-	user, err := h.userService.UpdateUser(id, req)
+	user, err := h.userService.UpdateUser(targetUserID, req)
 	if err != nil {
 		response.SendError(w, http.StatusBadRequest, "Failed to update user", err.Error())
 		return
@@ -142,16 +161,35 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
-	// Parse ID from URL
-	idStr := chi.URLParam(r, "id")
-	id, err := uuid.Parse(idStr)
+	// Get current user ID from JWT middleware (set by ClerkJWTMiddleware)
+	currentUserIDStr := r.Header.Get("X-User-ID")
+	if currentUserIDStr == "" {
+		response.SendUnauthorized(w, "User ID required")
+		return
+	}
+
+	currentUserID, err := uuid.Parse(currentUserIDStr)
+	if err != nil {
+		response.SendValidationError(w, "Invalid current user ID: "+err.Error())
+		return
+	}
+
+	// Parse target user ID from URL
+	targetUserIDStr := chi.URLParam(r, "id")
+	targetUserID, err := uuid.Parse(targetUserIDStr)
 	if err != nil {
 		response.SendValidationError(w, "Invalid user ID: ID must be a valid UUID")
 		return
 	}
 
+	// Authorization: Users can only delete their own account
+	if currentUserID != targetUserID {
+		response.SendForbidden(w, "You can only delete your own account")
+		return
+	}
+
 	// Delete user through service
-	if err := h.userService.DeleteUser(id); err != nil {
+	if err := h.userService.DeleteUser(targetUserID); err != nil {
 		response.SendNotFound(w, "User")
 		return
 	}
@@ -161,20 +199,24 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetProfile handles GET /api/v1/users/profile
-// This would typically get the current user's profile from JWT token
 func (h *Handler) GetProfile(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
-	// For now, this is a placeholder
-	// In a real app, you'd extract the user ID from JWT token
-	clerkUserID := r.Header.Get("X-Clerk-User-ID") // Example header
-	if clerkUserID == "" {
-		response.SendUnauthorized(w, "User not authenticated")
+	// Get current user ID from JWT middleware (set by ClerkJWTMiddleware)
+	currentUserIDStr := r.Header.Get("X-User-ID")
+	if currentUserIDStr == "" {
+		response.SendUnauthorized(w, "User ID required")
 		return
 	}
 
-	// Get user by Clerk ID
-	user, err := h.userService.GetUserByClerkID(clerkUserID)
+	currentUserID, err := uuid.Parse(currentUserIDStr)
+	if err != nil {
+		response.SendValidationError(w, "Invalid current user ID: "+err.Error())
+		return
+	}
+
+	// Get user profile
+	user, err := h.userService.GetUserByID(currentUserID)
 	if err != nil {
 		response.SendNotFound(w, "User")
 		return

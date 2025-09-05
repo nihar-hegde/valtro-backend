@@ -74,6 +74,11 @@ func SendUnauthorized(w http.ResponseWriter, message string) {
     SendError(w, http.StatusUnauthorized, "Unauthorized", message)
 }
 
+// SendForbidden sends a 403 Forbidden response
+func SendForbidden(w http.ResponseWriter, message string) {
+    SendError(w, http.StatusForbidden, "Forbidden", message)
+}
+
 // SendInternalError sends a 500 Internal Server Error response
 func SendInternalError(w http.ResponseWriter, message string) {
     SendError(w, http.StatusInternalServerError, "Internal Server Error", message)

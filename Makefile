@@ -27,15 +27,33 @@ clean:
 
 # Watch for changes and live reload using Air
 watch:
-	@if command -v air > /dev/null; then \
-		echo "Starting air..."; \
-		air; \
-	else \
-		echo "Air not found. Installing..."; \
+	@echo "Cleaning up old builds and cache..."
+	@rm -f main
+	@rm -rf tmp/
+	@mkdir -p tmp
+	@echo "Checking Air installation..."
+	@if ! command -v air > /dev/null; then \
+		echo "Installing Air..."; \
 		go install github.com/air-verse/air@latest; \
-		echo "Starting air..."; \
-		air; \
 	fi
+	@echo "Testing build command..."
+	@go build -o ./tmp/main ./cmd/api/main.go
+	@echo "Build successful, starting Air..."
+	@air
+
+# Alternative watch command using basic go run with file monitoring
+watch-simple:
+	@echo "Starting simple file watcher..."
+	@while true; do \
+		echo "Building and running..."; \
+		go run cmd/api/main.go & \
+		PID=$$!; \
+		inotifywait -e modify -r --exclude='tmp|\.git' . 2>/dev/null || \
+		(echo "inotifywait not available, using basic sleep method..."; sleep 5); \
+		echo "Files changed, restarting..."; \
+		kill $$PID 2>/dev/null || true; \
+		sleep 1; \
+	done
 
 # Database migration commands
 db-migrate:

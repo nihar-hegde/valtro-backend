@@ -3,10 +3,15 @@ package routes
 import (
 	"github.com/go-chi/chi/v5"
 	"github.com/nihar-hegde/valtro-backend/internal/handlers/user"
+	"github.com/nihar-hegde/valtro-backend/internal/middleware"
+	"gorm.io/gorm"
 )
 
-func RegisterUserRoutes(r chi.Router, userHandler *user.Handler) {
+func RegisterUserRoutes(r chi.Router, db *gorm.DB, userHandler *user.Handler) {
 	r.Route("/users", func(r chi.Router) {
+		// Apply Clerk JWT authentication to all user routes
+		r.Use(middleware.ClerkJWTMiddleware(db))
+		
 		r.Post("/", userHandler.Create)           // POST /api/v1/users
 		r.Get("/", userHandler.GetAll)            // GET /api/v1/users
 		r.Get("/profile", userHandler.GetProfile) // GET /api/v1/users/profile

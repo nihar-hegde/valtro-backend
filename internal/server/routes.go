@@ -25,6 +25,15 @@ func (s *Server) RegisterRoutes() {
 	s.router.Route("/api/v1", func(r chi.Router) {
 		// User routes
 		routes.RegisterUserRoutes(r, s.userHandler)
+		
+		// Organization routes
+		routes.RegisterOrganizationRoutes(r, s.orgHandler)
+		
+		// Project routes
+		routes.RegisterProjectRoutes(r, s.projectHandler)
+		
+		// Onboarding routes
+		routes.RegisterOnboardingRoutes(r, s.onboardingHandler)
 	})
 
 	// Webhook routes (outside of API versioning as they're called by external services)

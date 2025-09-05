@@ -11,7 +11,7 @@ import (
 	"github.com/nihar-hegde/valtro-backend/internal/dto"
 	userRepo "github.com/nihar-hegde/valtro-backend/internal/repositories/user"
 	userService "github.com/nihar-hegde/valtro-backend/internal/services/user"
-	svix "github.com/svix/svix-webhooks/go"
+	"github.com/svix/svix-webhooks/go"
 	"gorm.io/gorm"
 )
 

@@ -1,12 +1,12 @@
 package user
 
 import (
-	"errors"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/nihar-hegde/valtro-backend/internal/dto"
+	"github.com/nihar-hegde/valtro-backend/internal/errors"
 	"github.com/nihar-hegde/valtro-backend/internal/models"
 	userRepo "github.com/nihar-hegde/valtro-backend/internal/repositories/user"
 )
@@ -30,52 +30,30 @@ func (s *Service) CreateUser(req dto.CreateUserRequest) (*dto.UserResponse, erro
 		return nil, err
 	}
 
-	// Check if user already exists
+	// Check if user already exists by Clerk user ID
 	exists, err := s.userRepo.ClerkUserIDExists(req.ClerkUserID)
 	if err != nil {
-		return nil, errors.New("failed to check user existence")
+		return nil, err // Repository now returns structured errors
 	}
 	if exists {
-		return nil, errors.New("user with this Clerk ID already exists")
-	}
-
-	// Check if email already exists
-	emailExists, err := s.userRepo.EmailExists(req.Email)
-	if err != nil {
-		return nil, errors.New("failed to check email existence")
-	}
-	if emailExists {
-		return nil, errors.New("user with this email already exists")
-	}
-
-	// Check if username already exists (if provided)
-	if req.Username != nil && *req.Username != "" {
-		usernameExists, err := s.userRepo.UsernameExists(*req.Username)
-		if err != nil {
-			return nil, errors.New("failed to check username existence")
-		}
-		if usernameExists {
-			return nil, errors.New("username already taken")
-		}
+		return nil, errors.NewConflictError("User already exists with this Clerk ID", "Clerk ID: "+req.ClerkUserID)
 	}
 
 	// Create user model
 	user := &models.User{
-		ID:            uuid.New(), // Generate UUID
-		ClerkUserID:   req.ClerkUserID,
-		Email:         strings.ToLower(strings.TrimSpace(req.Email)),
-		FullName:      strings.TrimSpace(req.FullName),
-		Username:      req.Username,
-		ImageURL:      req.ImageURL,
-		EmailVerified: req.EmailVerified,
-		Active:        true,
-		CreatedAt:     time.Now(),
-		UpdatedAt:     time.Now(),
+		ID:          uuid.New(),
+		ClerkUserID: req.ClerkUserID,
+		Email:       strings.TrimSpace(req.Email),
+		FullName:    strings.TrimSpace(req.FullName),
+		Username:    req.Username,
+		ImageURL:    req.ImageURL,
+		CreatedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
 	}
 
 	// Save to database
 	if err := s.userRepo.Create(user); err != nil {
-		return nil, errors.New("failed to create user")
+		return nil, err // Repository now returns structured errors
 	}
 
 	// Convert to response DTO
@@ -112,7 +90,7 @@ func (s *Service) GetAllUsers(limit, offset int) ([]*dto.UserResponse, error) {
 
 	users, err := s.userRepo.GetAll(limit, offset)
 	if err != nil {
-		return nil, errors.New("failed to retrieve users")
+		return nil, err // Repository now returns structured errors
 	}
 
 	// Convert to response DTOs
@@ -141,7 +119,7 @@ func (s *Service) UpdateUser(id uuid.UUID, req dto.UpdateUserRequest) (*dto.User
 		if *req.Username != "" {
 			existingUser, err := s.userRepo.GetByUsername(*req.Username)
 			if err == nil && existingUser.ID != user.ID {
-				return nil, errors.New("username already taken")
+				return nil, errors.NewConflictError("Username already taken", "Username: "+*req.Username)
 			}
 		}
 		user.Username = req.Username
@@ -154,7 +132,7 @@ func (s *Service) UpdateUser(id uuid.UUID, req dto.UpdateUserRequest) (*dto.User
 
 	// Save changes
 	if err := s.userRepo.Update(user); err != nil {
-		return nil, errors.New("failed to update user")
+		return nil, err // Repository now returns structured errors
 	}
 
 	return s.toUserResponse(user), nil
@@ -170,7 +148,7 @@ func (s *Service) DeleteUser(id uuid.UUID) error {
 
 	// Soft delete
 	if err := s.userRepo.Delete(id); err != nil {
-		return errors.New("failed to delete user")
+		return err // Repository now returns structured errors
 	}
 
 	return nil
@@ -193,19 +171,19 @@ func (s *Service) UpdateLastSignIn(clerkUserID string) error {
 // validateCreateUser validates the create user request
 func (s *Service) validateCreateUser(req dto.CreateUserRequest) error {
 	if strings.TrimSpace(req.ClerkUserID) == "" {
-		return errors.New("clerk user ID is required")
+		return errors.NewValidationError("Clerk user ID is required")
 	}
 	if strings.TrimSpace(req.Email) == "" {
-		return errors.New("email is required")
+		return errors.NewValidationError("Email is required")
 	}
 	if strings.TrimSpace(req.FullName) == "" {
-		return errors.New("full name is required")
+		return errors.NewValidationError("Full name is required")
 	}
 	if len(req.FullName) < 2 {
-		return errors.New("full name must be at least 2 characters")
+		return errors.NewValidationError("Full name must be at least 2 characters")
 	}
 	if req.Username != nil && *req.Username != "" && len(*req.Username) < 3 {
-		return errors.New("username must be at least 3 characters")
+		return errors.NewValidationError("Username must be at least 3 characters")
 	}
 	return nil
 }

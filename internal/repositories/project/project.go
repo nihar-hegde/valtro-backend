@@ -1,9 +1,8 @@
 package project
 
 import (
-	"errors"
-
 	"github.com/google/uuid"
+	"github.com/nihar-hegde/valtro-backend/internal/errors"
 	"github.com/nihar-hegde/valtro-backend/internal/models"
 	"gorm.io/gorm"
 )
@@ -21,7 +20,7 @@ func NewRepository(db *gorm.DB) *Repository {
 // Create creates a new project in the database
 func (r *Repository) Create(project *models.Project) error {
 	if err := r.db.Create(project).Error; err != nil {
-		return err
+		return errors.NewInternalError("Failed to create project", err.Error())
 	}
 	return nil
 }
@@ -30,10 +29,10 @@ func (r *Repository) Create(project *models.Project) error {
 func (r *Repository) GetByID(id uuid.UUID) (*models.Project, error) {
 	var project models.Project
 	if err := r.db.First(&project, "id = ?", id).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, errors.New("project not found")
+		if gorm.ErrRecordNotFound == err {
+			return nil, errors.NewNotFoundError("Project", "Project with ID "+id.String()+" not found")
 		}
-		return nil, err
+		return nil, errors.NewInternalError("Failed to retrieve project", err.Error())
 	}
 	return &project, nil
 }
@@ -42,10 +41,10 @@ func (r *Repository) GetByID(id uuid.UUID) (*models.Project, error) {
 func (r *Repository) GetByAPIKey(apiKey string) (*models.Project, error) {
 	var project models.Project
 	if err := r.db.First(&project, "api_key = ?", apiKey).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, errors.New("project not found")
+		if gorm.ErrRecordNotFound == err {
+			return nil, errors.NewNotFoundError("Project", "Project with API key not found")
 		}
-		return nil, err
+		return nil, errors.NewInternalError("Failed to retrieve project by API key", err.Error())
 	}
 	return &project, nil
 }
@@ -54,7 +53,7 @@ func (r *Repository) GetByAPIKey(apiKey string) (*models.Project, error) {
 func (r *Repository) GetByOrganizationID(organizationID uuid.UUID) ([]*models.Project, error) {
 	var projects []*models.Project
 	if err := r.db.Where("organization_id = ?", organizationID).Find(&projects).Error; err != nil {
-		return nil, err
+		return nil, errors.NewInternalError("Failed to retrieve projects by organization ID", err.Error())
 	}
 	return projects, nil
 }
@@ -62,7 +61,7 @@ func (r *Repository) GetByOrganizationID(organizationID uuid.UUID) ([]*models.Pr
 // Update updates a project in the database
 func (r *Repository) Update(project *models.Project) error {
 	if err := r.db.Save(project).Error; err != nil {
-		return err
+		return errors.NewInternalError("Failed to update project", err.Error())
 	}
 	return nil
 }
@@ -70,7 +69,7 @@ func (r *Repository) Update(project *models.Project) error {
 // Delete soft deletes a project from the database
 func (r *Repository) Delete(id uuid.UUID) error {
 	if err := r.db.Delete(&models.Project{}, "id = ?", id).Error; err != nil {
-		return err
+		return errors.NewInternalError("Failed to delete project", err.Error())
 	}
 	return nil
 }
@@ -79,7 +78,7 @@ func (r *Repository) Delete(id uuid.UUID) error {
 func (r *Repository) APIKeyExists(apiKey string) (bool, error) {
 	var count int64
 	if err := r.db.Model(&models.Project{}).Where("api_key = ?", apiKey).Count(&count).Error; err != nil {
-		return false, err
+		return false, errors.NewInternalError("Failed to check API key existence", err.Error())
 	}
 	return count > 0, nil
 }
@@ -88,7 +87,7 @@ func (r *Repository) APIKeyExists(apiKey string) (bool, error) {
 func (r *Repository) NameExistsForOrganization(name string, organizationID uuid.UUID) (bool, error) {
 	var count int64
 	if err := r.db.Model(&models.Project{}).Where("name = ? AND organization_id = ?", name, organizationID).Count(&count).Error; err != nil {
-		return false, err
+		return false, errors.NewInternalError("Failed to check project name existence", err.Error())
 	}
 	return count > 0, nil
 }

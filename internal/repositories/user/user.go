@@ -1,9 +1,8 @@
 package user
 
 import (
-	"errors"
-
 	"github.com/google/uuid"
+	"github.com/nihar-hegde/valtro-backend/internal/errors"
 	"github.com/nihar-hegde/valtro-backend/internal/models"
 	"gorm.io/gorm"
 )
@@ -21,7 +20,7 @@ func NewRepository(db *gorm.DB) *Repository {
 // Create creates a new user in the database
 func (r *Repository) Create(user *models.User) error {
 	if err := r.db.Create(user).Error; err != nil {
-		return err
+		return errors.NewInternalError("Failed to create user", err.Error())
 	}
 	return nil
 }
@@ -30,10 +29,10 @@ func (r *Repository) Create(user *models.User) error {
 func (r *Repository) GetByID(id uuid.UUID) (*models.User, error) {
 	var user models.User
 	if err := r.db.First(&user, "id = ?", id).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, errors.New("user not found")
+		if gorm.ErrRecordNotFound == err {
+			return nil, errors.NewNotFoundError("User", "User with ID "+id.String()+" not found")
 		}
-		return nil, err
+		return nil, errors.NewInternalError("Failed to retrieve user", err.Error())
 	}
 	return &user, nil
 }
@@ -42,10 +41,10 @@ func (r *Repository) GetByID(id uuid.UUID) (*models.User, error) {
 func (r *Repository) GetByEmail(email string) (*models.User, error) {
 	var user models.User
 	if err := r.db.First(&user, "email = ?", email).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, errors.New("user not found")
+		if gorm.ErrRecordNotFound == err {
+			return nil, errors.NewNotFoundError("User", "User with email "+email+" not found")
 		}
-		return nil, err
+		return nil, errors.NewInternalError("Failed to retrieve user by email", err.Error())
 	}
 	return &user, nil
 }
@@ -54,10 +53,10 @@ func (r *Repository) GetByEmail(email string) (*models.User, error) {
 func (r *Repository) GetByClerkUserID(clerkUserID string) (*models.User, error) {
 	var user models.User
 	if err := r.db.First(&user, "clerk_user_id = ?", clerkUserID).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, errors.New("user not found")
+		if gorm.ErrRecordNotFound == err {
+			return nil, errors.NewNotFoundError("User", "User with Clerk ID "+clerkUserID+" not found")
 		}
-		return nil, err
+		return nil, errors.NewInternalError("Failed to retrieve user by Clerk ID", err.Error())
 	}
 	return &user, nil
 }
@@ -66,10 +65,10 @@ func (r *Repository) GetByClerkUserID(clerkUserID string) (*models.User, error) 
 func (r *Repository) GetByUsername(username string) (*models.User, error) {
 	var user models.User
 	if err := r.db.First(&user, "username = ?", username).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, errors.New("user not found")
+		if gorm.ErrRecordNotFound == err {
+			return nil, errors.NewNotFoundError("User", "User with username "+username+" not found")
 		}
-		return nil, err
+		return nil, errors.NewInternalError("Failed to retrieve user by username", err.Error())
 	}
 	return &user, nil
 }
@@ -81,7 +80,7 @@ func (r *Repository) GetAll(limit, offset int) ([]*models.User, error) {
 		Limit(limit).
 		Offset(offset).
 		Find(&users).Error; err != nil {
-		return nil, err
+		return nil, errors.NewInternalError("Failed to retrieve users", err.Error())
 	}
 	return users, nil
 }
@@ -89,7 +88,7 @@ func (r *Repository) GetAll(limit, offset int) ([]*models.User, error) {
 // Update updates a user in the database
 func (r *Repository) Update(user *models.User) error {
 	if err := r.db.Save(user).Error; err != nil {
-		return err
+		return errors.NewInternalError("Failed to update user", err.Error())
 	}
 	return nil
 }
@@ -97,7 +96,7 @@ func (r *Repository) Update(user *models.User) error {
 // Delete soft deletes a user from the database
 func (r *Repository) Delete(id uuid.UUID) error {
 	if err := r.db.Delete(&models.User{}, "id = ?", id).Error; err != nil {
-		return err
+		return errors.NewInternalError("Failed to delete user", err.Error())
 	}
 	return nil
 }
@@ -106,7 +105,7 @@ func (r *Repository) Delete(id uuid.UUID) error {
 func (r *Repository) EmailExists(email string) (bool, error) {
 	var count int64
 	if err := r.db.Model(&models.User{}).Where("email = ?", email).Count(&count).Error; err != nil {
-		return false, err
+		return false, errors.NewInternalError("Failed to check email existence", err.Error())
 	}
 	return count > 0, nil
 }
@@ -115,7 +114,7 @@ func (r *Repository) EmailExists(email string) (bool, error) {
 func (r *Repository) UsernameExists(username string) (bool, error) {
 	var count int64
 	if err := r.db.Model(&models.User{}).Where("username = ?", username).Count(&count).Error; err != nil {
-		return false, err
+		return false, errors.NewInternalError("Failed to check username existence", err.Error())
 	}
 	return count > 0, nil
 }
@@ -124,7 +123,7 @@ func (r *Repository) UsernameExists(username string) (bool, error) {
 func (r *Repository) ClerkUserIDExists(clerkUserID string) (bool, error) {
 	var count int64
 	if err := r.db.Model(&models.User{}).Where("clerk_user_id = ?", clerkUserID).Count(&count).Error; err != nil {
-		return false, err
+		return false, errors.NewInternalError("Failed to check Clerk user ID existence", err.Error())
 	}
 	return count > 0, nil
 }

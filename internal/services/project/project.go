@@ -3,13 +3,13 @@ package project
 import (
 	"crypto/rand"
 	"encoding/hex"
-	"errors"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/nihar-hegde/valtro-backend/internal/constants"
 	"github.com/nihar-hegde/valtro-backend/internal/dto"
+	"github.com/nihar-hegde/valtro-backend/internal/errors"
 	"github.com/nihar-hegde/valtro-backend/internal/models"
 	projectRepo "github.com/nihar-hegde/valtro-backend/internal/repositories/project"
 )
@@ -36,16 +36,16 @@ func (s *Service) CreateProject(req dto.CreateProjectRequest) (*dto.ProjectRespo
 	// Check if project name already exists for this organization
 	nameExists, err := s.projectRepo.NameExistsForOrganization(req.Name, req.OrganizationID)
 	if err != nil {
-		return nil, errors.New("failed to check project name existence")
+		return nil, err // Repository now returns structured errors
 	}
 	if nameExists {
-		return nil, errors.New("project with this name already exists in organization")
+		return nil, errors.NewConflictError("Project with this name already exists in organization", "Name: "+req.Name)
 	}
 
 	// Generate unique API key
 	apiKey, err := s.generateUniqueAPIKey()
 	if err != nil {
-		return nil, errors.New("failed to generate API key")
+		return nil, errors.NewInternalError("Failed to generate API key", err.Error())
 	}
 
 	// Create project model
@@ -60,7 +60,7 @@ func (s *Service) CreateProject(req dto.CreateProjectRequest) (*dto.ProjectRespo
 
 	// Save to database
 	if err := s.projectRepo.Create(project); err != nil {
-		return nil, errors.New("failed to create project")
+		return nil, err // Repository now returns structured errors
 	}
 
 	// Convert to response DTO
@@ -89,7 +89,7 @@ func (s *Service) GetProjectByAPIKey(apiKey string) (*dto.ProjectResponse, error
 func (s *Service) GetProjectsByOrganization(organizationID uuid.UUID) ([]*dto.ProjectResponse, error) {
 	projects, err := s.projectRepo.GetByOrganizationID(organizationID)
 	if err != nil {
-		return nil, errors.New("failed to retrieve projects")
+		return nil, err // Repository now returns structured errors
 	}
 
 	// Convert to response DTOs
@@ -111,23 +111,23 @@ func (s *Service) UpdateProject(id uuid.UUID, req dto.UpdateProjectRequest, orga
 
 	// Check if project belongs to the specified organization
 	if project.OrganizationID != organizationID {
-		return nil, errors.New("unauthorized: project doesn't belong to this organization")
+		return nil, errors.NewForbiddenError("Unauthorized: project doesn't belong to this organization", "Project ID: "+id.String())
 	}
 
 	// Update fields if provided
 	if req.Name != nil {
 		trimmedName := strings.TrimSpace(*req.Name)
 		if trimmedName == "" {
-			return nil, errors.New("project name cannot be empty")
+			return nil, errors.NewValidationError("Project name cannot be empty")
 		}
 
 		// Check if new name already exists for this organization (excluding current project)
 		nameExists, err := s.projectRepo.NameExistsForOrganization(trimmedName, organizationID)
 		if err != nil {
-			return nil, errors.New("failed to check project name existence")
+			return nil, err // Repository now returns structured errors
 		}
 		if nameExists && project.Name != trimmedName {
-			return nil, errors.New("project with this name already exists in organization")
+			return nil, errors.NewConflictError("Project with this name already exists in organization", "Name: "+trimmedName)
 		}
 
 		project.Name = trimmedName
@@ -137,7 +137,7 @@ func (s *Service) UpdateProject(id uuid.UUID, req dto.UpdateProjectRequest, orga
 
 	// Save changes
 	if err := s.projectRepo.Update(project); err != nil {
-		return nil, errors.New("failed to update project")
+		return nil, err // Repository now returns structured errors
 	}
 
 	return s.toProjectResponse(project), nil
@@ -153,12 +153,12 @@ func (s *Service) DeleteProject(id uuid.UUID, organizationID uuid.UUID) error {
 
 	// Check if project belongs to the specified organization
 	if project.OrganizationID != organizationID {
-		return errors.New("unauthorized: project doesn't belong to this organization")
+		return errors.NewForbiddenError("Unauthorized: project doesn't belong to this organization", "Project ID: "+id.String())
 	}
 
 	// Soft delete
 	if err := s.projectRepo.Delete(id); err != nil {
-		return errors.New("failed to delete project")
+		return err // Repository now returns structured errors
 	}
 
 	return nil
@@ -174,13 +174,13 @@ func (s *Service) RegenerateAPIKey(id uuid.UUID, organizationID uuid.UUID) (*dto
 
 	// Check if project belongs to the specified organization
 	if project.OrganizationID != organizationID {
-		return nil, errors.New("unauthorized: project doesn't belong to this organization")
+		return nil, errors.NewForbiddenError("Unauthorized: project doesn't belong to this organization", "Project ID: "+id.String())
 	}
 
 	// Generate new unique API key
 	apiKey, err := s.generateUniqueAPIKey()
 	if err != nil {
-		return nil, errors.New("failed to generate new API key")
+		return nil, errors.NewInternalError("Failed to generate new API key", err.Error())
 	}
 
 	project.APIKey = apiKey
@@ -188,7 +188,7 @@ func (s *Service) RegenerateAPIKey(id uuid.UUID, organizationID uuid.UUID) (*dto
 
 	// Save changes
 	if err := s.projectRepo.Update(project); err != nil {
-		return nil, errors.New("failed to update project")
+		return nil, err // Repository now returns structured errors
 	}
 
 	return s.toProjectResponse(project), nil
@@ -216,22 +216,22 @@ func (s *Service) generateUniqueAPIKey() (string, error) {
 		}
 	}
 	
-	return "", errors.New("failed to generate unique API key after multiple attempts")
+	return "", errors.NewInternalError("Failed to generate unique API key after multiple attempts", "")
 }
 
 // validateCreateProject validates the create project request
 func (s *Service) validateCreateProject(req dto.CreateProjectRequest) error {
 	if req.OrganizationID == uuid.Nil {
-		return errors.New("organization ID is required")
+		return errors.NewValidationError("Organization ID is required")
 	}
 	if strings.TrimSpace(req.Name) == "" {
-		return errors.New("project name is required")
+		return errors.NewValidationError("Project name is required")
 	}
 	if len(req.Name) < 2 {
-		return errors.New("project name must be at least 2 characters")
+		return errors.NewValidationError("Project name must be at least 2 characters")
 	}
 	if len(req.Name) > 255 {
-		return errors.New("project name must be less than 255 characters")
+		return errors.NewValidationError("Project name must be less than 255 characters")
 	}
 	return nil
 }

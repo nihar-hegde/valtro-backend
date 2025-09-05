@@ -1,9 +1,8 @@
 package organization
 
 import (
-	"errors"
-
 	"github.com/google/uuid"
+	"github.com/nihar-hegde/valtro-backend/internal/errors"
 	"github.com/nihar-hegde/valtro-backend/internal/models"
 	"gorm.io/gorm"
 )
@@ -21,7 +20,7 @@ func NewRepository(db *gorm.DB) *Repository {
 // Create creates a new organization in the database
 func (r *Repository) Create(organization *models.Organization) error {
 	if err := r.db.Create(organization).Error; err != nil {
-		return err
+		return errors.NewInternalError("Failed to create organization", err.Error())
 	}
 	return nil
 }
@@ -30,10 +29,10 @@ func (r *Repository) Create(organization *models.Organization) error {
 func (r *Repository) GetByID(id uuid.UUID) (*models.Organization, error) {
 	var organization models.Organization
 	if err := r.db.Where("id = ? AND deleted_at IS NULL", id).First(&organization).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, errors.New("organization not found")
+		if gorm.ErrRecordNotFound == err {
+			return nil, errors.NewNotFoundError("Organization", "Organization with ID "+id.String()+" not found")
 		}
-		return nil, err
+		return nil, errors.NewInternalError("Failed to retrieve organization", err.Error())
 	}
 	return &organization, nil
 }
@@ -42,7 +41,7 @@ func (r *Repository) GetByID(id uuid.UUID) (*models.Organization, error) {
 func (r *Repository) GetByOwnerID(ownerID uuid.UUID) ([]*models.Organization, error) {
 	var organizations []*models.Organization
 	if err := r.db.Where("owner_id = ? AND deleted_at IS NULL", ownerID).Find(&organizations).Error; err != nil {
-		return nil, err
+		return nil, errors.NewInternalError("Failed to retrieve organizations by owner ID", err.Error())
 	}
 	return organizations, nil
 }
@@ -56,7 +55,7 @@ func (r *Repository) GetByOwnerIDPaginated(ownerID uuid.UUID, offset, limit int)
 	if err := r.db.Model(&models.Organization{}).
 		Where("owner_id = ? AND deleted_at IS NULL", ownerID).
 		Count(&totalCount).Error; err != nil {
-		return nil, 0, err
+		return nil, 0, errors.NewInternalError("Failed to count organizations", err.Error())
 	}
 	
 	// Get paginated results
@@ -65,7 +64,7 @@ func (r *Repository) GetByOwnerIDPaginated(ownerID uuid.UUID, offset, limit int)
 		Limit(limit).
 		Order("created_at DESC").
 		Find(&organizations).Error; err != nil {
-		return nil, 0, err
+		return nil, 0, errors.NewInternalError("Failed to retrieve paginated organizations", err.Error())
 	}
 	
 	return organizations, totalCount, nil
@@ -78,10 +77,10 @@ func (r *Repository) GetByOwnerIDWithProjects(ownerID uuid.UUID) (*models.Organi
 	if err := r.db.Preload("Projects", "deleted_at IS NULL").
 		Where("owner_id = ? AND deleted_at IS NULL", ownerID).
 		First(&organization).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, errors.New("organization not found")
+		if gorm.ErrRecordNotFound == err {
+			return nil, errors.NewNotFoundError("Organization", "Organization with owner ID "+ownerID.String()+" not found")
 		}
-		return nil, err
+		return nil, errors.NewInternalError("Failed to retrieve organization with projects", err.Error())
 	}
 	return &organization, nil
 }
@@ -93,10 +92,10 @@ func (r *Repository) GetByIDWithProjects(id uuid.UUID) (*models.Organization, er
 	if err := r.db.Preload("Projects", "deleted_at IS NULL").
 		Where("id = ? AND deleted_at IS NULL", id).
 		First(&organization).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, errors.New("organization not found")
+		if gorm.ErrRecordNotFound == err {
+			return nil, errors.NewNotFoundError("Organization", "Organization with ID "+id.String()+" not found")
 		}
-		return nil, err
+		return nil, errors.NewInternalError("Failed to retrieve organization with projects", err.Error())
 	}
 	return &organization, nil
 }
@@ -104,7 +103,7 @@ func (r *Repository) GetByIDWithProjects(id uuid.UUID) (*models.Organization, er
 // Update updates an organization in the database
 func (r *Repository) Update(organization *models.Organization) error {
 	if err := r.db.Save(organization).Error; err != nil {
-		return err
+		return errors.NewInternalError("Failed to update organization", err.Error())
 	}
 	return nil
 }
@@ -112,7 +111,7 @@ func (r *Repository) Update(organization *models.Organization) error {
 // Delete soft deletes an organization from the database
 func (r *Repository) Delete(id uuid.UUID) error {
 	if err := r.db.Delete(&models.Organization{}, "id = ?", id).Error; err != nil {
-		return err
+		return errors.NewInternalError("Failed to delete organization", err.Error())
 	}
 	return nil
 }
@@ -123,7 +122,7 @@ func (r *Repository) NameExistsForOwner(name string, ownerID uuid.UUID) (bool, e
 	if err := r.db.Model(&models.Organization{}).
 		Where("name = ? AND owner_id = ? AND deleted_at IS NULL", name, ownerID).
 		Count(&count).Error; err != nil {
-		return false, err
+		return false, errors.NewInternalError("Failed to check organization name existence", err.Error())
 	}
 	return count > 0, nil
 }
@@ -134,7 +133,7 @@ func (r *Repository) HasOrganization(ownerID uuid.UUID) (bool, error) {
 	if err := r.db.Model(&models.Organization{}).
 		Where("owner_id = ? AND deleted_at IS NULL", ownerID).
 		Count(&count).Error; err != nil {
-		return false, err
+		return false, errors.NewInternalError("Failed to check organization existence", err.Error())
 	}
 	return count > 0, nil
 }

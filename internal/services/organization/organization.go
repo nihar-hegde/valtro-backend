@@ -1,12 +1,12 @@
 package organization
 
 import (
-	"errors"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/nihar-hegde/valtro-backend/internal/dto"
+	"github.com/nihar-hegde/valtro-backend/internal/errors"
 	"github.com/nihar-hegde/valtro-backend/internal/models"
 	orgRepo "github.com/nihar-hegde/valtro-backend/internal/repositories/organization"
 )
@@ -33,10 +33,10 @@ func (s *Service) CreateOrganization(req dto.CreateOrganizationRequest, ownerID 
 	// Check if organization name already exists for this owner
 	nameExists, err := s.orgRepo.NameExistsForOwner(req.Name, ownerID)
 	if err != nil {
-		return nil, errors.New("failed to check organization name existence")
+		return nil, err // Repository now returns structured errors
 	}
 	if nameExists {
-		return nil, errors.New("organization with this name already exists for user")
+		return nil, errors.NewConflictError("Organization with this name already exists for user", "Name: "+req.Name)
 	}
 
 	// Create organization model
@@ -50,7 +50,7 @@ func (s *Service) CreateOrganization(req dto.CreateOrganizationRequest, ownerID 
 
 	// Save to database
 	if err := s.orgRepo.Create(organization); err != nil {
-		return nil, errors.New("failed to create organization")
+		return nil, err // Repository now returns structured errors
 	}
 
 	// Convert to response DTO
@@ -70,7 +70,7 @@ func (s *Service) GetOrganizationByID(id uuid.UUID) (*dto.OrganizationResponse, 
 func (s *Service) GetOrganizationsByOwner(ownerID uuid.UUID) ([]*dto.OrganizationResponse, error) {
 	organizations, err := s.orgRepo.GetByOwnerID(ownerID)
 	if err != nil {
-		return nil, errors.New("failed to retrieve organizations")
+		return nil, err // Repository now returns structured errors
 	}
 
 	// Convert to response DTOs
@@ -124,23 +124,23 @@ func (s *Service) UpdateOrganization(id uuid.UUID, req dto.UpdateOrganizationReq
 
 	// Check if user owns this organization
 	if organization.OwnerID != ownerID {
-		return nil, errors.New("unauthorized: you don't own this organization")
+		return nil, errors.NewForbiddenError("Unauthorized: you don't own this organization", "Organization ID: "+id.String())
 	}
 
 	// Update fields if provided
 	if req.Name != nil {
 		trimmedName := strings.TrimSpace(*req.Name)
 		if trimmedName == "" {
-			return nil, errors.New("organization name cannot be empty")
+			return nil, errors.NewValidationError("Organization name cannot be empty")
 		}
 
 		// Check if new name already exists for this owner (excluding current organization)
 		nameExists, err := s.orgRepo.NameExistsForOwner(trimmedName, ownerID)
 		if err != nil {
-			return nil, errors.New("failed to check organization name existence")
+			return nil, err // Repository now returns structured errors
 		}
 		if nameExists && organization.Name != trimmedName {
-			return nil, errors.New("organization with this name already exists for user")
+			return nil, errors.NewConflictError("Organization with this name already exists for user", "Name: "+trimmedName)
 		}
 
 		organization.Name = trimmedName
@@ -150,7 +150,7 @@ func (s *Service) UpdateOrganization(id uuid.UUID, req dto.UpdateOrganizationReq
 
 	// Save changes
 	if err := s.orgRepo.Update(organization); err != nil {
-		return nil, errors.New("failed to update organization")
+		return nil, err // Repository now returns structured errors
 	}
 
 	return s.toOrganizationResponse(organization), nil
@@ -166,12 +166,12 @@ func (s *Service) DeleteOrganization(id uuid.UUID, ownerID uuid.UUID) error {
 
 	// Check if user owns this organization
 	if organization.OwnerID != ownerID {
-		return errors.New("unauthorized: you don't own this organization")
+		return errors.NewForbiddenError("Unauthorized: you don't own this organization", "Organization ID: "+id.String())
 	}
 
 	// Soft delete
 	if err := s.orgRepo.Delete(id); err != nil {
-		return errors.New("failed to delete organization")
+		return err // Repository now returns structured errors
 	}
 
 	return nil
@@ -181,7 +181,7 @@ func (s *Service) DeleteOrganization(id uuid.UUID, ownerID uuid.UUID) error {
 func (s *Service) CheckUserOrganization(ownerID uuid.UUID) (*dto.UserOrganizationCheckResponse, error) {
 	hasOrg, err := s.orgRepo.HasOrganization(ownerID)
 	if err != nil {
-		return nil, errors.New("failed to check user organization")
+		return nil, err // Repository now returns structured errors
 	}
 
 	response := &dto.UserOrganizationCheckResponse{
@@ -191,7 +191,7 @@ func (s *Service) CheckUserOrganization(ownerID uuid.UUID) (*dto.UserOrganizatio
 	if hasOrg {
 		organizations, err := s.orgRepo.GetByOwnerID(ownerID)
 		if err != nil {
-			return nil, errors.New("failed to retrieve user organization")
+			return nil, err // Repository now returns structured errors
 		}
 		if len(organizations) > 0 {
 			response.Organization = s.toOrganizationResponse(organizations[0])
@@ -204,13 +204,13 @@ func (s *Service) CheckUserOrganization(ownerID uuid.UUID) (*dto.UserOrganizatio
 // validateCreateOrganization validates the create organization request
 func (s *Service) validateCreateOrganization(req dto.CreateOrganizationRequest) error {
 	if strings.TrimSpace(req.Name) == "" {
-		return errors.New("organization name is required")
+		return errors.NewValidationError("Organization name is required")
 	}
 	if len(req.Name) < 2 {
-		return errors.New("organization name must be at least 2 characters")
+		return errors.NewValidationError("Organization name must be at least 2 characters")
 	}
 	if len(req.Name) > 255 {
-		return errors.New("organization name must be less than 255 characters")
+		return errors.NewValidationError("Organization name must be less than 255 characters")
 	}
 	return nil
 }
